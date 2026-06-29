@@ -63,6 +63,31 @@ jobs:
     - name: Build kernel
       run: |
         make ${{ env.KERNEL_DEFCONFIG }}
+        
+        # Run full prepare to generate all required files
+        make prepare 2>&1 || true
+        make scripts 2>&1 || true
+        
+        # Check if vdso.lds was generated
+        echo "Checking vdso.lds..."
+        ls -la arch/arm64/kernel/vdso/vdso.lds 2>/dev/null || echo "vdso.lds not found"
+        
+        # If still missing, generate it manually
+        if [ ! -f arch/arm64/kernel/vdso/vdso.lds ]; then
+          echo "Manually generating vdso.lds..."
+          mkdir -p arch/arm64/kernel/vdso
+          cpp -P -C -Uarm64 -D__ASSEMBLY__ -DKBUILD_MODNAME='"vdso"' \
+            -I./arch/arm64/include \
+            -I./include \
+            -I./arch/arm64/include/uapi \
+            -I./include/uapi \
+            -I./arch/arm64/include/generated \
+            -I./arch/arm64/kernel/vdso \
+            ./arch/arm64/kernel/vdso/vdso.lds.S > ./arch/arm64/kernel/vdso/vdso.lds 2>&1 || \
+            cp ./arch/arm64/kernel/vdso/vdso.lds.S ./arch/arm64/kernel/vdso/vdso.lds
+        fi
+        
+        # Now build the kernel
         make -j$(nproc) 2>&1 | tee build.log
         
     - name: Check build result
