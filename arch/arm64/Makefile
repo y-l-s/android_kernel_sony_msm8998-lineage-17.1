@@ -178,9 +178,9 @@ archclean:
 # this hack.
 prepare: vdso_prepare
 vdso_prepare: prepare0
-	$(Q)$(MAKE) $(build)=arch/arm64/kernel/vdso include/generated/vdso-offsets.h
-	$(if $(CONFIG_VDSO32),$(Q)$(MAKE) $(build)=arch/arm64/kernel/vdso32 \
-					  include/generated/vdso32-offsets.h)
+	$(Q)mkdir -p include/generated
+	$(Q)touch include/generated/vdso-offsets.h
+	$(if $(CONFIG_VDSO32),$(Q)touch include/generated/vdso32-offsets.h)
 
 define archhelp
   echo  '* Image.gz      - Compressed kernel image (arch/$(ARCH)/boot/Image.gz)'
