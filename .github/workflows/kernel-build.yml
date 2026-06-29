@@ -30,35 +30,35 @@ jobs:
           lzop make pngcrush python3 schedtool \
           squashfs-tools xsltproc zip unzip \
           u-boot-tools device-tree-compiler libelf-dev \
-          cpio kmod rsync
+          cpio kmod rsync xz-utils
         
-    - name: Download AOSP GCC 4.9 toolchains
+    - name: Download ARM GCC toolchains
       run: |
         mkdir -p toolchains
         cd toolchains
         
-        echo "Downloading aarch64 toolchain..."
-        wget -q https://github.com/LineageOS/android_prebuilts_gcc_linux-x86_aarch64_aarch64-linux-android-4.9/archive/refs/heads/lineage-17.1.tar.gz -O aarch64.tar.gz
-        tar -xzf aarch64.tar.gz
-        mv android_prebuilts_gcc_linux-x86_aarch64_aarch64-linux-android-4.9-lineage-17.1 aarch64-linux-android-4.9
-        rm aarch64.tar.gz
+        echo "Downloading aarch64 GCC 9.2 toolchain..."
+        wget -q https://developer.arm.com/-/media/Files/downloads/gnu-a/9.2-2019.12/binrel/gcc-arm-9.2-2019.12-x86_64-aarch64-none-linux-gnu.tar.xz -O aarch64.tar.xz
+        tar -xf aarch64.tar.xz
+        mv gcc-arm-9.2-2019.12-x86_64-aarch64-none-linux-gnu aarch64
+        rm aarch64.tar.xz
         
-        echo "Downloading arm32 toolchain..."
-        wget -q https://github.com/LineageOS/android_prebuilts_gcc_linux-x86_arm_arm-linux-androideabi-4.9/archive/refs/heads/lineage-17.1.tar.gz -O arm.tar.gz
-        tar -xzf arm.tar.gz
-        mv android_prebuilts_gcc_linux-x86_arm_arm-linux-androideabi-4.9-lineage-17.1 arm-linux-androideabi-4.9
-        rm arm.tar.gz
+        echo "Downloading arm32 GCC 9.2 toolchain..."
+        wget -q https://developer.arm.com/-/media/Files/downloads/gnu-a/9.2-2019.12/binrel/gcc-arm-9.2-2019.12-x86_64-arm-none-linux-gnueabihf.tar.xz -O arm.tar.xz
+        tar -xf arm.tar.xz
+        mv gcc-arm-9.2-2019.12-x86_64-arm-none-linux-gnueabihf arm32
+        rm arm.tar.xz
         
         echo "Toolchains downloaded"
-        ls -la
+        ./aarch64/bin/aarch64-none-linux-gnu-gcc --version
         
     - name: Setup build variables
       run: |
         TOOLCHAIN_PATH="$PWD/toolchains"
-        echo "CROSS_COMPILE=$TOOLCHAIN_PATH/aarch64-linux-android-4.9/bin/aarch64-linux-android-" >> $GITHUB_ENV
-        echo "CROSS_COMPILE_ARM32=$TOOLCHAIN_PATH/arm-linux-androideabi-4.9/bin/arm-linux-androideabi-" >> $GITHUB_ENV
+        echo "CROSS_COMPILE=$TOOLCHAIN_PATH/aarch64/bin/aarch64-none-linux-gnu-" >> $GITHUB_ENV
+        echo "CROSS_COMPILE_ARM32=$TOOLCHAIN_PATH/arm32/bin/arm-none-linux-gnueabihf-" >> $GITHUB_ENV
         
-        $TOOLCHAIN_PATH/aarch64-linux-android-4.9/bin/aarch64-linux-android-gcc --version
+        $TOOLCHAIN_PATH/aarch64/bin/aarch64-none-linux-gnu-gcc --version
         
     - name: Build kernel
       run: |
