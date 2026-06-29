@@ -30,7 +30,9 @@ jobs:
           gcc-arm-linux-gnueabihf g++-arm-linux-gnueabihf \
           git gzip libncurses5 libssl-dev libxml2 \
           lzop make pngcrush python3 schedtool \
-          squashfs-tools xsltproc zip unzip
+          squashfs-tools xsltproc zip unzip \
+          u-boot-tools device-tree-compiler libelf-dev \
+          cpio kmod
         
     - name: Setup build variables
       run: |
@@ -38,22 +40,20 @@ jobs:
         echo "SUBARCH=arm64" >> $GITHUB_ENV
         echo "CROSS_COMPILE=aarch64-linux-gnu-" >> $GITHUB_ENV
         echo "CROSS_COMPILE_ARM32=arm-linux-gnueabihf-" >> $GITHUB_ENV
-        echo "O=out" >> $GITHUB_ENV
         
     - name: Build kernel
       run: |
-        mkdir -p out
-        make O=out ${{ env.KERNEL_DEFCONFIG }}
-        make O=out -j$(nproc) 2>&1 | tee build.log
+        make ${{ env.KERNEL_DEFCONFIG }}
+        make -j$(nproc) 2>&1 | tee build.log
         
     - name: Check build result
       run: |
         echo "=== Build Log (last 50 lines) ==="
         tail -50 build.log
         
-        if [ -f "out/arch/arm64/boot/Image.gz-dtb" ]; then
+        if [ -f "arch/arm64/boot/Image.gz-dtb" ]; then
           echo "Build successful!"
-          ls -lh out/arch/arm64/boot/Image.gz-dtb
+          ls -lh arch/arm64/boot/Image.gz-dtb
         else
           echo "Build failed - no kernel image generated"
           exit 1
@@ -64,7 +64,7 @@ jobs:
       with:
         name: kernel-${{ env.TARGET_DEVICE }}
         path: |
-          out/arch/arm64/boot/Image.gz-dtb
+          arch/arm64/boot/Image.gz-dtb
           build.log
-          out/.config
+          .config
         retention-days: 7
