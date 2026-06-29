@@ -1,0 +1,114 @@
+name: Build Kernel for Sony XZ1 Compact (lilac)
+
+on:
+  push:
+    branches: [ main, lineage-17.1 ]
+  workflow_dispatch:
+
+env:
+  ARCH: arm64
+  SUBARCH: arm64
+  TARGET_DEVICE: lilac
+  KERNEL_DEFCONFIG: lineage-msm8998-yoshino-lilac_defconfig
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    
+    steps:
+    - name: Checkout kernel source
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 1
+        
+    - name: Install build dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          bc bison build-essential ccache curl flex \
+          git gzip libncurses5 libssl-dev libxml2 \
+          lzop make pngcrush python3 schedtool \
+          squashfs-tools xsltproc zip unzip \
+          u-boot-tools device-tree-compiler libelf-dev \
+          cpio kmod rsync xz-utils
+        
+    - name: Download ARM GCC toolchains
+      run: |
+        mkdir -p toolchains
+        cd toolchains
+        
+        echo "Downloading aarch64 GCC 9.2 toolchain..."
+        wget -q https://developer.arm.com/-/media/Files/downloads/gnu-a/9.2-2019.12/binrel/gcc-arm-9.2-2019.12-x86_64-aarch64-none-linux-gnu.tar.xz -O aarch64.tar.xz
+        tar -xf aarch64.tar.xz
+        mv gcc-arm-9.2-2019.12-x86_64-aarch64-none-linux-gnu aarch64
+        rm aarch64.tar.xz
+        
+        echo "Downloading arm32 GCC 9.2 toolchain..."
+        wget -q https://developer.arm.com/-/media/Files/downloads/gnu-a/9.2-2019.12/binrel/gcc-arm-9.2-2019.12-x86_64-arm-none-linux-gnueabihf.tar.xz -O arm.tar.xz
+        tar -xf arm.tar.xz
+        mv gcc-arm-9.2-2019.12-x86_64-arm-none-linux-gnueabihf arm32
+        rm arm.tar.xz
+        
+        echo "Toolchains downloaded"
+        ./aarch64/bin/aarch64-none-linux-gnu-gcc --version
+        
+    - name: Setup build variables
+      run: |
+        TOOLCHAIN_PATH="$PWD/toolchains"
+        echo "CROSS_COMPILE=$TOOLCHAIN_PATH/aarch64/bin/aarch64-none-linux-gnu-" >> $GITHUB_ENV
+        echo "CROSS_COMPILE_ARM32=$TOOLCHAIN_PATH/arm32/bin/arm-none-linux-gnueabihf-" >> $GITHUB_ENV
+        
+        $TOOLCHAIN_PATH/aarch64/bin/aarch64-none-linux-gnu-gcc --version
+        
+    - name: Build kernel
+      run: |
+        make ${{ env.KERNEL_DEFCONFIG }}
+        
+        # Run full prepare to generate all required files
+        make prepare 2>&1 || true
+        make scripts 2>&1 || true
+        
+        # Check if vdso.lds was generated
+        echo "Checking vdso.lds..."
+        ls -la arch/arm64/kernel/vdso/vdso.lds 2>/dev/null || echo "vdso.lds not found"
+        
+        # If still missing, generate it manually
+        if [ ! -f arch/arm64/kernel/vdso/vdso.lds ]; then
+          echo "Manually generating vdso.lds..."
+          mkdir -p arch/arm64/kernel/vdso
+          cpp -P -C -Uarm64 -D__ASSEMBLY__ -DKBUILD_MODNAME='"vdso"' \
+            -I./arch/arm64/include \
+            -I./include \
+            -I./arch/arm64/include/uapi \
+            -I./include/uapi \
+            -I./arch/arm64/include/generated \
+            -I./arch/arm64/kernel/vdso \
+            ./arch/arm64/kernel/vdso/vdso.lds.S > ./arch/arm64/kernel/vdso/vdso.lds 2>&1 || \
+            cp ./arch/arm64/kernel/vdso/vdso.lds.S ./arch/arm64/kernel/vdso/vdso.lds
+        fi
+        
+        # Now build the kernel
+        make -j$(nproc) 2>&1 | tee build.log
+        
+    - name: Check build result
+      run: |
+        echo "=== Build Log (last 50 lines) ==="
+        tail -50 build.log
+        
+        if [ -f "arch/arm64/boot/Image.gz-dtb" ]; then
+          echo "Build successful!"
+          ls -lh arch/arm64/boot/Image.gz-dtb
+        else
+          echo "Build failed - no kernel image generated"
+          exit 1
+        fi
+        
+    - name: Upload kernel artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: kernel-${{ env.TARGET_DEVICE }}
+        path: |
+          arch/arm64/boot/Image.gz-dtb
+          build.log
+          .config
+        retention-days: 7
