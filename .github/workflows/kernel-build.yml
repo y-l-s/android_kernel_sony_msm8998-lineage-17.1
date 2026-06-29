@@ -21,12 +21,13 @@ jobs:
       with:
         fetch-depth: 1
         
-    - name: Prepare build environment
+    - name: Install build tools and toolchains
       run: |
         sudo apt-get update
         sudo apt-get install -y \
           bc bison build-essential ccache curl flex \
           gcc-aarch64-linux-gnu g++-aarch64-linux-gnu \
+          gcc-arm-linux-gnueabihf g++-arm-linux-gnueabihf \
           git gzip libncurses5 libssl-dev libxml2 \
           lzop make pngcrush python3 schedtool \
           squashfs-tools xsltproc zip unzip
@@ -36,6 +37,7 @@ jobs:
         echo "ARCH=arm64" >> $GITHUB_ENV
         echo "SUBARCH=arm64" >> $GITHUB_ENV
         echo "CROSS_COMPILE=aarch64-linux-gnu-" >> $GITHUB_ENV
+        echo "CROSS_COMPILE_ARM32=arm-linux-gnueabihf-" >> $GITHUB_ENV
         echo "O=out" >> $GITHUB_ENV
         
     - name: Build kernel
