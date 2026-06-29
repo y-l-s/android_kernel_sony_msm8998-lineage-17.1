@@ -1,0 +1,97 @@
+name: Build Kernel for Sony XZ1 Compact (lilac)
+
+on:
+  push:
+    branches: [ main, lineage-17.1 ]
+  workflow_dispatch:
+
+env:
+  ARCH: arm64
+  SUBARCH: arm64
+  TARGET_DEVICE: lilac
+  KERNEL_DEFCONFIG: lineage-msm8998-yoshino-lilac_defconfig
+  TOOLCHAIN_BRANCH: lineage-17.1
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    
+    steps:
+    - name: Checkout kernel source
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 1
+        
+    - name: Prepare build environment
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          bc bison build-essential ccache curl flex \
+          gcc-aarch64-linux-gnu g++-aarch64-linux-gnu \
+          git gzip libncurses5 libssl-dev libxml2 \
+          lzop make pngcrush python3 schedtool \
+          squashfs-tools xsltproc zip unzip
+        
+    - name: Download ARM64 toolchain
+      run: |
+        mkdir -p toolchain
+        cd toolchain
+        
+        # Try multiple sources for toolchain
+        if [ ! -d "gcc" ]; then
+          echo "Downloading aarch64 toolchain..."
+          wget -q https://developer.arm.com/-/media/Files/downloads/gnu-a/9.2/binrel/gcc-arm-9.2-2019.12-x86_64-aarch64-none-linux-gnu.tar.xz -O toolchain.tar.xz || \
+          wget -q https://storage.googleapis.com/lineage-build-tools/gcc-arm-9.2-2019.12-x86_64-aarch64-none-linux-gnu.tar.xz -O toolchain.tar.xz
+          
+          tar -xf toolchain.tar.xz
+          mv gcc-arm-9.2-2019.12-x86_64-aarch64-none-linux-gnu gcc
+          rm toolchain.tar.xz
+        fi
+        
+        echo "TOOLCHAIN_PATH=$PWD/gcc/bin" >> $GITHUB_ENV
+        echo "CROSS_COMPILE=$PWD/gcc/bin/aarch64-none-linux-gnu-" >> $GITHUB_ENV
+        
+    - name: Setup build variables
+      run: |
+        echo "ARCH=arm64" >> $GITHUB_ENV
+        echo "SUBARCH=arm64" >> $GITHUB_ENV
+        echo "O=out" >> $GITHUB_ENV
+        echo "LLVM=0" >> $GITHUB_ENV
+        echo "LLVM_IAS=0" >> $GITHUB_ENV
+        
+    - name: Build kernel
+      run: |
+        mkdir -p out
+        make O=out ${{ env.KERNEL_DEFCONFIG }}
+        make O=out -j$(nproc) 2>&1 | tee build.log
+        
+    - name: Check build result
+      run: |
+        echo "=== Build Log (last 50 lines) ==="
+        tail -50 build.log
+        
+        if [ -f "out/arch/arm64/boot/Image.gz-dtb" ]; then
+          echo "✓ Build successful!"
+          ls -lh out/arch/arm64/boot/Image.gz-dtb
+        else
+          echo "✗ Build failed - no kernel image generated"
+          exit 1
+        fi
+        
+    - name: Upload kernel artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: kernel-${{ env.TARGET_DEVICE }}-{{ github.sha }}
+        path: |
+          out/arch/arm64/boot/Image.gz-dtb
+          build.log
+          out/.config
+        retention-days: 7
+        compression-level: 9
+        
+    - name: Generate SHA256 checksum
+      if: success()
+      run: |
+        cd out/arch/arm64/boot
+        sha256sum Image.gz-dtb > Image.gz-dtb.sha256sum
+        cat Image.gz-dtb.sha256sum
