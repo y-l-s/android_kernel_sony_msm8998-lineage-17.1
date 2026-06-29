@@ -63,7 +63,13 @@ jobs:
     - name: Build kernel
       run: |
         make ${{ env.KERNEL_DEFCONFIG }}
-        make -j$(nproc) 2>&1 | tee build.log
+        
+        # First try to build just entry.o to see the error
+        echo "=== Testing entry.S compilation ==="
+        make arch/arm64/kernel/entry.o 2>&1 || echo "entry.o build failed"
+        
+        echo "=== Building kernel (single-thread for debug) ==="
+        make -j1 2>&1 | tee build.log | tail -200
         
     - name: Check build result
       run: |
