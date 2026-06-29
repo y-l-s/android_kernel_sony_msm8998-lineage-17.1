@@ -1,0 +1,68 @@
+name: Build Kernel for Sony XZ1 Compact (lilac)
+
+on:
+  push:
+    branches: [ main, lineage-17.1 ]
+  workflow_dispatch:
+
+env:
+  ARCH: arm64
+  SUBARCH: arm64
+  TARGET_DEVICE: lilac
+  KERNEL_DEFCONFIG: lineage-msm8998-yoshino-lilac_defconfig
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    
+    steps:
+    - name: Checkout kernel source
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 1
+        
+    - name: Prepare build environment
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          bc bison build-essential ccache curl flex \
+          gcc-aarch64-linux-gnu g++-aarch64-linux-gnu \
+          git gzip libncurses5 libssl-dev libxml2 \
+          lzop make pngcrush python3 schedtool \
+          squashfs-tools xsltproc zip unzip
+        
+    - name: Setup build variables
+      run: |
+        echo "ARCH=arm64" >> $GITHUB_ENV
+        echo "SUBARCH=arm64" >> $GITHUB_ENV
+        echo "CROSS_COMPILE=aarch64-linux-gnu-" >> $GITHUB_ENV
+        echo "O=out" >> $GITHUB_ENV
+        
+    - name: Build kernel
+      run: |
+        mkdir -p out
+        make O=out ${{ env.KERNEL_DEFCONFIG }}
+        make O=out -j$(nproc) 2>&1 | tee build.log
+        
+    - name: Check build result
+      run: |
+        echo "=== Build Log (last 50 lines) ==="
+        tail -50 build.log
+        
+        if [ -f "out/arch/arm64/boot/Image.gz-dtb" ]; then
+          echo "Build successful!"
+          ls -lh out/arch/arm64/boot/Image.gz-dtb
+        else
+          echo "Build failed - no kernel image generated"
+          exit 1
+        fi
+        
+    - name: Upload kernel artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: kernel-${{ env.TARGET_DEVICE }}
+        path: |
+          out/arch/arm64/boot/Image.gz-dtb
+          build.log
+          out/.config
+        retention-days: 7
