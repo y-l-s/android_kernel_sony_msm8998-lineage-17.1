@@ -21,38 +21,44 @@ jobs:
       with:
         fetch-depth: 1
         
-    - name: Install build tools and toolchains
+    - name: Install build dependencies
       run: |
         sudo apt-get update
         sudo apt-get install -y \
           bc bison build-essential ccache curl flex \
-          gcc-aarch64-linux-gnu g++-aarch64-linux-gnu \
-          gcc-arm-linux-gnueabihf g++-arm-linux-gnueabihf \
           git gzip libncurses5 libssl-dev libxml2 \
           lzop make pngcrush python3 schedtool \
           squashfs-tools xsltproc zip unzip \
           u-boot-tools device-tree-compiler libelf-dev \
-          cpio kmod
+          cpio kmod rsync
+        
+    - name: Download AOSP GCC 4.9 toolchains
+      run: |
+        mkdir -p toolchains
+        cd toolchains
+        
+        echo "Downloading aarch64 toolchain..."
+        wget -q https://github.com/LineageOS/android_prebuilts_gcc_linux-x86_aarch64_aarch64-linux-android-4.9/archive/refs/heads/lineage-17.1.tar.gz -O aarch64.tar.gz
+        tar -xzf aarch64.tar.gz
+        mv android_prebuilts_gcc_linux-x86_aarch64_aarch64-linux-android-4.9-lineage-17.1 aarch64-linux-android-4.9
+        rm aarch64.tar.gz
+        
+        echo "Downloading arm32 toolchain..."
+        wget -q https://github.com/LineageOS/android_prebuilts_gcc_linux-x86_arm_arm-linux-androideabi-4.9/archive/refs/heads/lineage-17.1.tar.gz -O arm.tar.gz
+        tar -xzf arm.tar.gz
+        mv android_prebuilts_gcc_linux-x86_arm_arm-linux-androideabi-4.9-lineage-17.1 arm-linux-androideabi-4.9
+        rm arm.tar.gz
+        
+        echo "Toolchains downloaded"
+        ls -la
         
     - name: Setup build variables
       run: |
-        echo "ARCH=arm64" >> $GITHUB_ENV
-        echo "SUBARCH=arm64" >> $GITHUB_ENV
-        echo "CROSS_COMPILE=aarch64-linux-gnu-" >> $GITHUB_ENV
-        echo "CROSS_COMPILE_ARM32=arm-linux-gnueabihf-" >> $GITHUB_ENV
+        TOOLCHAIN_PATH="$PWD/toolchains"
+        echo "CROSS_COMPILE=$TOOLCHAIN_PATH/aarch64-linux-android-4.9/bin/aarch64-linux-android-" >> $GITHUB_ENV
+        echo "CROSS_COMPILE_ARM32=$TOOLCHAIN_PATH/arm-linux-androideabi-4.9/bin/arm-linux-androideabi-" >> $GITHUB_ENV
         
-    - name: Generate vdso.lds manually
-      run: |
-        cpp -P -C -Uarm64 -D__ASSEMBLY__ -Iarch/arm64/include -Iinclude -Iarch/arm64/include/uapi -Iinclude/uapi \
-          arch/arm64/kernel/vdso/vdso.lds.S > arch/arm64/kernel/vdso/vdso.lds || true
-        
-        if [ -f arch/arm64/kernel/vdso32/vdso.lds.S ]; then
-          cpp -P -C -Uarm -D__ASSEMBLY__ -Iarch/arm/include -Iinclude -Iarch/arm/include/uapi -Iinclude/uapi \
-            arch/arm64/kernel/vdso32/vdso.lds.S > arch/arm64/kernel/vdso32/vdso.lds || true
-        fi
-        
-        echo "Generated vdso.lds files"
-        ls -la arch/arm64/kernel/vdso/vdso.lds 2>/dev/null || echo "vdso.lds not found"
+        $TOOLCHAIN_PATH/aarch64-linux-android-4.9/bin/aarch64-linux-android-gcc --version
         
     - name: Build kernel
       run: |
