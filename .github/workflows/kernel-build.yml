@@ -41,6 +41,19 @@ jobs:
         echo "CROSS_COMPILE=aarch64-linux-gnu-" >> $GITHUB_ENV
         echo "CROSS_COMPILE_ARM32=arm-linux-gnueabihf-" >> $GITHUB_ENV
         
+    - name: Generate vdso.lds manually
+      run: |
+        cpp -P -C -Uarm64 -D__ASSEMBLY__ -Iarch/arm64/include -Iinclude -Iarch/arm64/include/uapi -Iinclude/uapi \
+          arch/arm64/kernel/vdso/vdso.lds.S > arch/arm64/kernel/vdso/vdso.lds || true
+        
+        if [ -f arch/arm64/kernel/vdso32/vdso.lds.S ]; then
+          cpp -P -C -Uarm -D__ASSEMBLY__ -Iarch/arm/include -Iinclude -Iarch/arm/include/uapi -Iinclude/uapi \
+            arch/arm64/kernel/vdso32/vdso.lds.S > arch/arm64/kernel/vdso32/vdso.lds || true
+        fi
+        
+        echo "Generated vdso.lds files"
+        ls -la arch/arm64/kernel/vdso/vdso.lds 2>/dev/null || echo "vdso.lds not found"
+        
     - name: Build kernel
       run: |
         make ${{ env.KERNEL_DEFCONFIG }}
