@@ -64,12 +64,12 @@ jobs:
       run: |
         make ${{ env.KERNEL_DEFCONFIG }}
         
-        # First try to build just entry.o to see the error
-        echo "=== Testing entry.S compilation ==="
-        make arch/arm64/kernel/entry.o 2>&1 || echo "entry.o build failed"
+        echo "=== Testing initramfs_data.S compilation ==="
+        make usr/initramfs_data.o 2>&1 || echo "initramfs_data.o build failed"
+        ls -la usr/initramfs_data* 2>/dev/null || true
         
-        echo "=== Building kernel (single-thread for debug) ==="
-        make -j1 2>&1 | tee build.log | tail -200
+        echo "=== Building kernel ==="
+        make -j$(nproc) 2>&1 | tee build.log | tail -100
         
     - name: Check build result
       run: |
