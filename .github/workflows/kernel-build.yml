@@ -63,7 +63,13 @@ jobs:
     - name: Build kernel
       run: |
         make ${{ env.KERNEL_DEFCONFIG }}
-        make -j$(nproc) 2>&1 | tee build.log
+        
+        echo "=== Testing initramfs_data.S compilation ==="
+        make usr/initramfs_data.o 2>&1 || echo "initramfs_data.o build failed"
+        ls -la usr/initramfs_data* 2>/dev/null || true
+        
+        echo "=== Building kernel ==="
+        make -j$(nproc) 2>&1 | tee build.log | tail -100
         
     - name: Check build result
       run: |
