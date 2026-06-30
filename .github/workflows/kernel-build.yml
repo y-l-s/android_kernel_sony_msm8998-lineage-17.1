@@ -63,6 +63,17 @@ jobs:
     - name: Build kernel
       run: |
         make ${{ env.KERNEL_DEFCONFIG }}
+        
+        # Debug: check if source files exist
+        echo "=== Checking critical source files ==="
+        ls -la arch/arm64/kernel/entry.S 2>/dev/null || echo "ERROR: entry.S missing!"
+        ls -la arch/arm64/mm/cache.S 2>/dev/null || echo "ERROR: cache.S missing!"
+        ls -la arch/arm64/kernel/*.S | head -5 || echo "No .S files in arch/arm64/kernel/"
+        
+        # Try to compile entry.S manually
+        echo "=== Testing entry.S compilation ==="
+        make arch/arm64/kernel/entry.o V=1 2>&1 || echo "entry.S compilation failed"
+        
         make -j$(nproc) 2>&1 | tee build.log
         
     - name: Check build result
