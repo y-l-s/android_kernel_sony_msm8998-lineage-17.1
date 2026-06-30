@@ -63,6 +63,7 @@ jobs:
     - name: Build kernel
       run: |
         make ${{ env.KERNEL_DEFCONFIG }}
+<<<<<<< HEAD
         
         # Debug: check if source files exist
         echo "=== Checking critical source files ==="
@@ -74,6 +75,8 @@ jobs:
         echo "=== Testing entry.S compilation ==="
         make arch/arm64/kernel/entry.o V=1 2>&1 || echo "entry.S compilation failed"
         
+=======
+>>>>>>> 7c3f96e6b3cfe65fde8ef56379692e6d8072f598
         make -j$(nproc) 2>&1 | tee build.log
         
     - name: Check build result
